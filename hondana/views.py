@@ -114,4 +114,8 @@ def version(name, version):
     assert version in project.versions
 
     doc_path = version_path(name, version)
-    return flask.send_from_directory(doc_path, "index.html")
+    doc_relpath = os.path.relpath(doc_path, STORE_PREFIX)
+    redirect_path = os.path.join("/static", doc_relpath)
+    response = flask.make_response()
+    response.headers['X-Accel-Redirect'] = redirect_path
+    return response
