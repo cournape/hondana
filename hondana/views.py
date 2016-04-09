@@ -32,8 +32,8 @@ PROJECTS_TEMPLATE = jinja2.Template("""
 
 {% block body %}
     <ul>
-    {% for project in projects %}
-    <li>{{ project.name }}</li>
+    {% for project, link in projects %}
+    <li><a href={{ link }}>{{ project.name }}</a></li>
     {% endfor %}
     </ul>
 {% endblock %}
@@ -89,21 +89,25 @@ def list_versions(name):
 
 @app.route('/')
 def projects():
-    return PROJECTS_TEMPLATE.render(projects=six.itervalues(_PROJECTS))
+    projects = [
+        (project, project.name)
+        for project in six.itervalues(_PROJECTS)
+    ]
+    return PROJECTS_TEMPLATE.render(projects=projects)
 
 
-@app.route('/<name>')
+@app.route('/<name>/')
 def project(name):
     assert name in _PROJECTS
     project = _PROJECTS[name]
     versions = [
-        (version, "invalid")
+        (version, project.name + "/" + version)
         for version in project.versions
     ]
     return PROJECT_TEMPLATE.render(project=project, versions=versions)
 
 
-@app.route('/<name>/<version>')
+@app.route('/<name>/<version>/')
 def version(name, version):
     assert name in _PROJECTS
     project = _PROJECTS[name]
