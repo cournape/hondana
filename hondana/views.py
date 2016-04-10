@@ -51,7 +51,7 @@ def list_versions(name):
 def projects():
     projects = [
         (project, project.name)
-        for project in six.itervalues(_PROJECTS)
+        for project in sorted(six.itervalues(_PROJECTS), key=lambda p: p.name)
     ]
     return flask.render_template("projects.html", projects=projects)
 
@@ -62,7 +62,7 @@ def project(name):
     project = _PROJECTS[name]
     versions = [
         (version, "/" + project.name + "/" + version)
-        for version in project.versions
+        for version in sorted(project.versions)
     ]
     return flask.render_template("project.html", project=project, versions=versions)
 
@@ -75,7 +75,7 @@ def version(name, version):
 
     doc_path = version_path(name, version)
     doc_relpath = os.path.relpath(doc_path, STORE_PREFIX)
-    redirect_path = os.path.join("/static", doc_relpath)
+    redirect_path = os.path.join("/docs-static", doc_relpath)
     response = flask.make_response()
     response.headers['X-Accel-Redirect'] = redirect_path
     return response
