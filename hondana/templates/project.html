@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1>{{ project.name }}</h1>
+
+{% block body %}
+    <ul>
+    {% for version, link in versions %}
+    <li><a href={{ link }}>{{version }}</a></li>
+    {% endfor %}
+    </ul>
+{% endblock %}
+
+</body>
+</html>

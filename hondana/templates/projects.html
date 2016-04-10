@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1>Projects</h1>
+
+{% block body %}
+    <ul>
+    {% for project, link in projects %}
+    <li><a href={{ link }}>{{ project.name }}</a></li>
+    {% endfor %}
+    </ul>
+{% endblock %}
+
+</body>
+</html>

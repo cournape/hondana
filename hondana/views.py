@@ -23,58 +23,18 @@ PROJECTS_PREFIX = os.path.join(STORE_PREFIX, "docs", "projects")
 makedirs(PROJECTS_PREFIX)
 
 
-PROJECTS_TEMPLATE = jinja2.Template("""
-<!DOCTYPE html>
-<html>
-<body>
-
-<h1>Projects</h1>
-
-{% block body %}
-    <ul>
-    {% for project, link in projects %}
-    <li><a href={{ link }}>{{ project.name }}</a></li>
-    {% endfor %}
-    </ul>
-{% endblock %}
-
-</body>
-</html>
-""")
-
-
-PROJECT_TEMPLATE = jinja2.Template("""
-<!DOCTYPE html>
-<html>
-<body>
-
-<h1>{{ project.name }}</h1>
-
-{% block body %}
-    <ul>
-    {% for version, link in versions %}
-    <li><a href={{ link }}>{{version }}</a></li>
-    {% endfor %}
-    </ul>
-{% endblock %}
-
-</body>
-</html>
-""")
-
-
 def project_path(name):
     return os.path.join(PROJECTS_PREFIX, name)
-
-
-def version_path(name, version):
-    return os.path.join(project_path(name), version)
 
 
 _PROJECTS = {}
 for name in os.listdir(PROJECTS_PREFIX):
     versions = os.listdir(project_path(name))
     _PROJECTS[name] = Project(name.decode(), versions)
+
+
+def version_path(name, version):
+    return os.path.join(project_path(name), version)
 
 
 def list_projects():
@@ -93,7 +53,7 @@ def projects():
         (project, project.name)
         for project in six.itervalues(_PROJECTS)
     ]
-    return PROJECTS_TEMPLATE.render(projects=projects)
+    return flask.render_template("projects.html", projects=projects)
 
 
 @app.route('/<name>/')
@@ -101,10 +61,10 @@ def project(name):
     assert name in _PROJECTS
     project = _PROJECTS[name]
     versions = [
-        (version, project.name + "/" + version)
+        (version, "/" + project.name + "/" + version)
         for version in project.versions
     ]
-    return PROJECT_TEMPLATE.render(project=project, versions=versions)
+    return flask.render_template("project.html", project=project, versions=versions)
 
 
 @app.route('/<name>/<version>/')
