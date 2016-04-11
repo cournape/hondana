@@ -11,6 +11,7 @@ from .utils import makedirs
 @attributes
 class Configuration(object):
     store_prefix = attr(validator=instance_of(six.string_types))
+    secret_key = attr(validator=instance_of(six.string_types))
 
     @property
     def projects_prefix(self):
