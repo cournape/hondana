@@ -10,26 +10,27 @@ import jinja2
 import six
 
 from .app import app
+from .config import Configuration
 from .models import Project, ProjectsManager
-from .utils import makedirs
 
 
 STORE_PREFIX = os.path.abspath(".store")
-# We don't makedirs that one to avoid silently storing them somehwere
-# unexpected
-assert os.path.exists(STORE_PREFIX)
+CONFIG = Configuration(STORE_PREFIX)
+CONFIG.validate()
 
-PROJECTS_PREFIX = os.path.join(STORE_PREFIX, "docs", "projects")
-makedirs(PROJECTS_PREFIX)
-
-_PROJECTS_MANAGER = ProjectsManager.from_directory(PROJECTS_PREFIX)
+_PROJECTS_MANAGER = ProjectsManager.from_directory(CONFIG.projects_prefix)
 
 
 def version_path(name, version):
-    return os.path.join(PROJECTS_PREFIX, name, version)
+    return os.path.join(CONFIG.projects_prefix, name, version)
 
 
 @app.route('/')
+def root():
+    return flask.redirect(flask.url_for("projects"))
+
+
+@app.route('/projects/')
 def projects():
     projects = [
         (project, project.name) for project in _PROJECTS_MANAGER.get_projects()
@@ -37,17 +38,17 @@ def projects():
     return flask.render_template("projects.html", projects=projects)
 
 
-@app.route('/<name>/')
+@app.route('/projects/<name>/')
 def project(name):
     project = _PROJECTS_MANAGER.get_project(name)
     versions = [
-        (version, "/" + project.name + "/" + version)
+        (version, "/projects/" + project.name + "/" + version)
         for version in sorted(project.versions)
     ]
     return flask.render_template("project.html", project=project, versions=versions)
 
 
-@app.route('/<name>/<version>/')
+@app.route('/projects/<name>/<version>/')
 def version(name, version):
     project = _PROJECTS_MANAGER.get_project(name)
     assert version in project.versions
