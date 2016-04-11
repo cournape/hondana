@@ -10,7 +10,7 @@ import jinja2
 import six
 
 from .app import app
-from .models import Project
+from .models import Project, ProjectsManager
 from .utils import makedirs
 
 
@@ -22,44 +22,24 @@ assert os.path.exists(STORE_PREFIX)
 PROJECTS_PREFIX = os.path.join(STORE_PREFIX, "docs", "projects")
 makedirs(PROJECTS_PREFIX)
 
-
-def project_path(name):
-    return os.path.join(PROJECTS_PREFIX, name)
-
-
-_PROJECTS = {}
-for name in os.listdir(PROJECTS_PREFIX):
-    versions = os.listdir(project_path(name))
-    _PROJECTS[name] = Project(name.decode(), versions)
+_PROJECTS_MANAGER = ProjectsManager.from_directory(PROJECTS_PREFIX)
 
 
 def version_path(name, version):
-    return os.path.join(project_path(name), version)
-
-
-def list_projects():
-    return list(six.iterkeys(_PROJECTS))
-
-
-def list_versions(name):
-    project = _PROJECTS.get(self.request.matchdict['name'])
-    assert project is not None
-    return list(project.versions)
+    return os.path.join(PROJECTS_PREFIX, name, version)
 
 
 @app.route('/')
 def projects():
     projects = [
-        (project, project.name)
-        for project in sorted(six.itervalues(_PROJECTS), key=lambda p: p.name)
+        (project, project.name) for project in _PROJECTS_MANAGER.get_projects()
     ]
     return flask.render_template("projects.html", projects=projects)
 
 
 @app.route('/<name>/')
 def project(name):
-    assert name in _PROJECTS
-    project = _PROJECTS[name]
+    project = _PROJECTS_MANAGER.get_project(name)
     versions = [
         (version, "/" + project.name + "/" + version)
         for version in sorted(project.versions)
@@ -69,8 +49,7 @@ def project(name):
 
 @app.route('/<name>/<version>/')
 def version(name, version):
-    assert name in _PROJECTS
-    project = _PROJECTS[name]
+    project = _PROJECTS_MANAGER.get_project(name)
     assert version in project.versions
 
     doc_path = version_path(name, version)
