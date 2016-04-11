@@ -36,6 +36,13 @@ class ProjectsManager(object):
             if not version in project.versions:
                 project.versions.append(version)
 
+    def delete_project(self, name):
+        self._projects.pop(name, None)
+
+    def delete_version(self, name, version):
+        project = self.get_project(name)
+        project.versions.remove(version)
+
     def get_project(self, name):
         if self.has_project(name):
             return self._projects[name]

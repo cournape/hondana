@@ -7,6 +7,7 @@ import re
 import textwrap
 
 import flask
+import flask.views
 import jinja2
 import six
 import werkzeug
@@ -29,8 +30,12 @@ app.config["SECRET_KEY"] = CONFIG.secret_key
 _PROJECTS_MANAGER = ProjectsManager.from_directory(CONFIG.projects_prefix)
 
 
+def project_path(name):
+    return os.path.join(CONFIG.projects_prefix, name)
+
+
 def version_path(name, version):
-    return os.path.join(CONFIG.projects_prefix, name, version)
+    return os.path.join(project_path(name), version)
 
 
 def unzip_doc(config, projects_manager, upload, name, version):
@@ -57,7 +62,9 @@ def unzip_doc(config, projects_manager, upload, name, version):
 
 
 # API routes
-@app.route("/api/v0/json/upload", methods=["POST"])
+_API_ROOT = "/api/v0/json"
+
+@app.route(_API_ROOT + "/upload", methods=["POST"])
 def upload():
     files = flask.request.files
     if "upload" in files:
@@ -79,6 +86,46 @@ def upload():
         return "", 204
     else:
         return "Invalid request format", 400
+
+
+class ProjectsAPI(flask.views.MethodView):
+    def get(self, project_name, version):
+        if project_name is None:
+            project_names = [project.name for project in _PROJECTS_MANAGER.get_projects()]
+            return flask.jsonify({"projects": project_names})
+        else:
+            if _PROJECTS_MANAGER.has_project(project_name):
+                project = _PROJECTS_MANAGER.get_project(project_name)
+                return flask.jsonify({"name": project_name, "versions": project.versions})
+            else:
+                return flask.jsonify({"error": "no such project"}), 404
+
+    def delete(self, project_name, version):
+        if _PROJECTS_MANAGER.has_project(project_name):
+            if version is None:
+                rm_rf(project_path(project_name))
+                _PROJECTS_MANAGER.delete_project(project_name)
+            else:
+                if _PROJECTS_MANAGER.has_version(project_name, version):
+                    rm_rf(version_path(project_name, version))
+                    _PROJECTS_MANAGER.delete_version(project_name, version)
+                else:
+                    return flask.jsonify({"error": "no such version"}), 404
+            return "", 204
+        else:
+            return flask.jsonify({"error": "no such project"}), 404
+
+
+projects_view = ProjectsAPI.as_view("api_projects")
+app.add_url_rule(
+    _API_ROOT + '/projects/', defaults={"project_name": None, "version": None},
+    view_func=projects_view, methods=["GET"])
+app.add_url_rule(
+    _API_ROOT + '/projects/<project_name>', defaults={"version": None},
+    view_func=projects_view, methods=["GET", "DELETE"])
+app.add_url_rule(
+    _API_ROOT + '/projects/<project_name>/<version>',
+    view_func=projects_view, methods=["DELETE"])
 
 
 # WEB routes
