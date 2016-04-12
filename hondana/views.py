@@ -45,6 +45,13 @@ def _backup_if_necessary(metadata_store, name, version):
     return backup
 
 
+def _store_metadata(target_directory, name, version, blob_id):
+    with open(os.path.join(target_directory, ".hondana")) as fp:
+        fp.write("name: {}".format(name))
+        fp.write("version: {}".format(version))
+        fp.write("blob_id: {}".format(blob_id))
+
+
 def unzip_doc(config, upload, name, version):
     # The principle:
     # 1. If the name, version pair is already registered, we move aside the
@@ -65,6 +72,10 @@ def unzip_doc(config, upload, name, version):
                 upload.save(zipfile_path)
                 with zipfile.ZipFile(zipfile_path) as zp:
                     zp.extractall(target_directory)
+                # We store those metadata in the target directory so that in
+                # principle, we could recreate the redis DB from the FS if we
+                # lose the redis DB
+                _store_metadata(target_directory, name, version, blob_id)
                 metadata_store.register_version(name, version, blob_id)
         except Exception:
             rm_rf(target_directory)
