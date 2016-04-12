@@ -2,20 +2,20 @@
 """
 from __future__ import absolute_import, print_function
 
+import contextlib
 import os.path
 import re
-import textwrap
+import uuid
 
 import flask
 import flask.views
-import jinja2
-import six
+import redis
 import werkzeug
 import zipfile
 
 from .app import app
 from .config import Configuration
-from .models import Project, ProjectsManager
+from .metadata_store import MetadataStore
 from .utils import rm_rf, tempdir
 
 
@@ -27,42 +27,56 @@ CONFIG = Configuration(STORE_PREFIX, "a super secret")
 CONFIG.validate()
 app.config["SECRET_KEY"] = CONFIG.secret_key
 
-_PROJECTS_MANAGER = ProjectsManager.from_directory(CONFIG.projects_prefix)
+
+def compute_blob_path(blob_id):
+    return os.path.join(CONFIG.projects_prefix, blob_id[:2], blob_id[2:])
 
 
-def project_path(name):
-    return os.path.join(CONFIG.projects_prefix, name)
-
-
-def version_path(name, version):
-    return os.path.join(project_path(name), version)
-
-
-def unzip_doc(config, projects_manager, upload, name, version):
-    target_directory = version_path(name, version)
-
-    if projects_manager.has_version(name, version):
-        backup = target_directory + ".bak"
-        os.rename(target_directory, backup)
-    else:
-        backup = None
-
+def _backup_if_necessary(metadata_store, name, version):
     try:
-        with tempdir() as d:
-	    zipfile_path = os.path.join(d, "doc.zip")
-            upload.save(zipfile_path)
-            with zipfile.ZipFile(zipfile_path) as zp:
-                zp.extractall(target_directory)
-        projects_manager.add_project(name, version)
-    except Exception:
-        rm_rf(target_directory)
-        if backup is not None:
-            os.rename(backup, target_directory)
-        raise
+        blob_id = metadata_store.get_blob_id(name, version)
+    except ValueError:
+        backup = None
+    else:
+        blob_path = compute_blob_path(blob_id)
+        backup = blob_path + ".bak"
+        os.rename(blob_path, backup)
+
+    return backup
+
+
+def unzip_doc(config, upload, name, version):
+    # The principle:
+    # 1. If the name, version pair is already registered, we move aside the
+    #    target directory as backup
+    # 2. We compute a new uuid, from which we compute a unique path where we
+    #    extract the newly uploaded zipfile. The uuid means the target
+    #    directory is very unlikely to collide with an existing doc directory
+    # 3. If some reason 2. fails, we restore the backup
+    with _metadata_store(config) as metadata_store:
+        backup = _backup_if_necessary(metadata_store, name, version)
+
+        blob_id = uuid.uuid4().hex
+        target_directory = compute_blob_path(blob_id)
+
+        try:
+            with tempdir() as d:
+                zipfile_path = os.path.join(d, "doc.zip")
+                upload.save(zipfile_path)
+                with zipfile.ZipFile(zipfile_path) as zp:
+                    zp.extractall(target_directory)
+                metadata_store.register_version(name, version, blob_id)
+        except Exception:
+            rm_rf(target_directory)
+            if backup is not None:
+                backup_target = os.path.splitext(backup)[0]
+                os.rename(backup, backup_target)
+            raise
 
 
 # API routes
 _API_ROOT = "/api/v0/json"
+
 
 @app.route(_API_ROOT + "/upload", methods=["POST"])
 def upload():
@@ -81,7 +95,7 @@ def upload():
         name = m.groups()[0]
         version = m.groups()[1]
 
-        unzip_doc(CONFIG, _PROJECTS_MANAGER, upload, name, version)
+        unzip_doc(CONFIG, upload, name, version)
 
         return "", 204
     else:
@@ -90,30 +104,38 @@ def upload():
 
 class ProjectsAPI(flask.views.MethodView):
     def get(self, project_name, version):
-        if project_name is None:
-            project_names = [project.name for project in _PROJECTS_MANAGER.get_projects()]
-            return flask.jsonify({"projects": project_names})
-        else:
-            if _PROJECTS_MANAGER.has_project(project_name):
-                project = _PROJECTS_MANAGER.get_project(project_name)
-                return flask.jsonify({"name": project_name, "versions": project.versions})
+        with _metadata_store(CONFIG) as metadata_store:
+            if project_name is None:
+                project_names = metadata_store.get_project_names()
+                return flask.jsonify({"projects": project_names})
             else:
-                return flask.jsonify({"error": "no such project"}), 404
+                if metadata_store.has_project(project_name):
+                    versions = metadata_store.get_versions(project_name)
+                    return flask.jsonify(
+                        {"name": project_name, "versions": versions}
+                    )
+                else:
+                    return flask.jsonify({"error": "no such project"}), 404
 
     def delete(self, project_name, version):
-        if _PROJECTS_MANAGER.has_project(project_name):
-            if version is None:
-                rm_rf(project_path(project_name))
-                _PROJECTS_MANAGER.delete_project(project_name)
-            else:
-                if _PROJECTS_MANAGER.has_version(project_name, version):
-                    rm_rf(version_path(project_name, version))
-                    _PROJECTS_MANAGER.delete_version(project_name, version)
+        with _metadata_store(CONFIG) as metadata_store:
+            if metadata_store.has_project(project_name):
+                if version is None:
+                    metadata_store.unregister_project(project_name)
                 else:
-                    return flask.jsonify({"error": "no such version"}), 404
-            return "", 204
-        else:
-            return flask.jsonify({"error": "no such project"}), 404
+                    if metadata_store.has_version(project_name, version):
+                        blob_id = metadata_store.get_blob_id(
+                            project_name, version
+                        )
+                        metadata_store.unregister_version(
+                            project_name, version
+                        )
+                        rm_rf(compute_blob_path(blob_id))
+                    else:
+                        return flask.jsonify({"error": "no such version"}), 404
+                return "", 204
+            else:
+                return flask.jsonify({"error": "no such project"}), 404
 
 
 projects_view = ProjectsAPI.as_view("api_projects")
@@ -136,30 +158,50 @@ def root():
 
 @app.route('/projects/')
 def projects():
-    projects = [
-        (project, project.name) for project in _PROJECTS_MANAGER.get_projects()
-    ]
+    with _metadata_store(CONFIG) as metadata_store:
+        projects = [
+            (project_name, project_name)
+            for project_name in sorted(metadata_store.get_project_names())
+        ]
     return flask.render_template("projects.html", projects=projects)
 
 
 @app.route('/projects/<name>/')
 def project(name):
-    project = _PROJECTS_MANAGER.get_project(name)
-    versions = [
-        (version, "/projects/" + project.name + "/" + version)
-        for version in sorted(project.versions)
-    ]
-    return flask.render_template("project.html", project=project, versions=versions)
+    with _metadata_store(CONFIG) as metadata_store:
+        if not metadata_store.has_project(name):
+            return "", 404
+
+        versions = [
+            (version, "/projects/" + name + "/" + version)
+            for version in sorted(metadata_store.get_versions(name))
+        ]
+
+    return flask.render_template(
+        "project.html", project=project, versions=versions
+    )
 
 
 @app.route('/projects/<name>/<version>/')
 def version(name, version):
-    project = _PROJECTS_MANAGER.get_project(name)
-    assert version in project.versions
+    with _metadata_store(CONFIG) as metadata_store:
+        try:
+            blob_id = metadata_store.get_blob_id(name, version)
+        except ValueError:
+            return "", 404
 
-    doc_path = version_path(name, version)
+        doc_path = compute_blob_path(blob_id)
+
     doc_relpath = os.path.relpath(doc_path, STORE_PREFIX)
     redirect_path = os.path.join("/docs-static", doc_relpath)
     response = flask.make_response()
     response.headers['X-Accel-Redirect'] = redirect_path
     return response
+
+
+@contextlib.contextmanager
+def _metadata_store(config):
+    cx = redis.StrictRedis(
+        host=config.redis_host, port=config.redis_port, db=config.redis_db
+    )
+    yield MetadataStore(cx)
