@@ -4,18 +4,14 @@ from __future__ import absolute_import, print_function
 
 import os.path
 import re
-import textwrap
 import uuid
 
 import flask
 import flask.views
-import jinja2
-import six
 import werkzeug
 import zipfile
 
 from .app import app, projects_prefix, store_prefix
-from .models import Project, ProjectsMetadataManager
 from .utils import rm_rf, tempdir
 
 
@@ -32,6 +28,7 @@ def version_path(name, version):
 
 def _backup_if_required(projects_manager, name, version):
     if projects_manager.has_version(name, version):
+        target_directory = version_path(name, version)
         backup = target_directory + ".bak"
         os.rename(target_directory, backup)
     else:
@@ -67,6 +64,7 @@ def unzip_doc(projects_manager, upload, name, version):
 # API routes
 _API_ROOT = "/api/v0/json"
 
+
 @app.route(_API_ROOT + "/upload", methods=["POST"])
 def upload():
     files = flask.request.files
@@ -95,12 +93,16 @@ class ProjectsAPI(flask.views.MethodView):
     def get(self, project_name, version):
         projects_metadata = flask.g.projects_metadata
         if project_name is None:
-            project_names = [project.name for project in projects_metadata.get_projects()]
+            project_names = [
+                project.name for project in projects_metadata.get_projects()
+            ]
             return flask.jsonify({"projects": project_names})
         else:
             if projects_metadata.has_project(project_name):
                 project = projects_metadata.get_project(project_name)
-                return flask.jsonify({"name": project_name, "versions": project.versions})
+                return flask.jsonify(
+                    {"name": project_name, "versions": project.versions}
+                )
             else:
                 return flask.jsonify({"error": "no such project"}), 404
 
@@ -111,9 +113,9 @@ class ProjectsAPI(flask.views.MethodView):
                 rm_rf(project_path(project_name))
                 projects_metadata.delete_project(project_name)
             else:
-                if _projects_metadata_manager.has_version(project_name, version):
+                if projects_metadata.has_version(project_name, version):
                     rm_rf(version_path(project_name, version))
-                    _projects_metadata_manager.delete_version(project_name, version)
+                    projects_metadata.delete_version(project_name, version)
                 else:
                     return flask.jsonify({"error": "no such version"}), 404
             return "", 204
@@ -151,7 +153,9 @@ def projects():
 def project(name):
     project = flask.g.projects_metadata.get_project(name)
     versions = sorted(project.versions)
-    return flask.render_template("project.html", project=project, versions=versions)
+    return flask.render_template(
+        "project.html", project=project, versions=versions
+    )
 
 
 @app.route('/projects/<name>/<version>/')

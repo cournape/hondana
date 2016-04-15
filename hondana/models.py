@@ -34,7 +34,7 @@ class ProjectsMetadataManager(object):
             self._projects[project.name] = project
         else:
             project = self.get_project(name)
-            if not version in project.versions:
+            if version not in project.versions:
                 project.versions.append(version)
 
     def delete_project(self, name):
