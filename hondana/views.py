@@ -14,8 +14,7 @@ import six
 import werkzeug
 import zipfile
 
-from .app import app
-from .config import Configuration
+from .app import app, projects_prefix, store_prefix
 from .models import Project, ProjectsMetadataManager
 from .utils import rm_rf, tempdir
 
@@ -23,16 +22,8 @@ from .utils import rm_rf, tempdir
 _DOCZIP_R = re.compile("^([^-]+)-(.+).zip$")
 
 
-STORE_PREFIX = os.path.abspath(".store")
-CONFIG = Configuration(STORE_PREFIX, "a super secret")
-CONFIG.validate()
-app.config["SECRET_KEY"] = CONFIG.secret_key
-
-_PROJECTS_METADATA_MANAGER = ProjectsMetadataManager.from_directory(CONFIG.projects_prefix)
-
-
 def project_path(name):
-    return os.path.join(CONFIG.projects_prefix, name)
+    return os.path.join(projects_prefix(app), name)
 
 
 def version_path(name, version):
@@ -49,7 +40,7 @@ def _backup_if_required(projects_manager, name, version):
     return backup
 
 
-def unzip_doc(config, projects_manager, upload, name, version):
+def unzip_doc(projects_manager, upload, name, version):
     target_directory = version_path(name, version)
 
     blob_id = uuid.uuid4().hex
@@ -93,7 +84,7 @@ def upload():
         name = m.groups()[0]
         version = m.groups()[1]
 
-        unzip_doc(CONFIG, _PROJECTS_METADATA_MANAGER, upload, name, version)
+        unzip_doc(flask.g.projects_metadata, upload, name, version)
 
         return "", 204
     else:
@@ -102,25 +93,27 @@ def upload():
 
 class ProjectsAPI(flask.views.MethodView):
     def get(self, project_name, version):
+        projects_metadata = flask.g.projects_metadata
         if project_name is None:
-            project_names = [project.name for project in _PROJECTS_METADATA_MANAGER.get_projects()]
+            project_names = [project.name for project in projects_metadata.get_projects()]
             return flask.jsonify({"projects": project_names})
         else:
-            if _PROJECTS_METADATA_MANAGER.has_project(project_name):
-                project = _PROJECTS_METADATA_MANAGER.get_project(project_name)
+            if projects_metadata.has_project(project_name):
+                project = projects_metadata.get_project(project_name)
                 return flask.jsonify({"name": project_name, "versions": project.versions})
             else:
                 return flask.jsonify({"error": "no such project"}), 404
 
     def delete(self, project_name, version):
-        if _PROJECTS_METADATA_MANAGER.has_project(project_name):
+        projects_metadata = flask.g.projects_metadata
+        if projects_metadata.has_project(project_name):
             if version is None:
                 rm_rf(project_path(project_name))
-                _PROJECTS_METADATA_MANAGER.delete_project(project_name)
+                projects_metadata.delete_project(project_name)
             else:
-                if _PROJECTS_METADATA_MANAGER.has_version(project_name, version):
+                if _projects_metadata_manager.has_version(project_name, version):
                     rm_rf(version_path(project_name, version))
-                    _PROJECTS_METADATA_MANAGER.delete_version(project_name, version)
+                    _projects_metadata_manager.delete_version(project_name, version)
                 else:
                     return flask.jsonify({"error": "no such version"}), 404
             return "", 204
@@ -149,25 +142,25 @@ def root():
 @app.route('/projects/')
 def projects():
     project_names = [
-        project.name for project in _PROJECTS_METADATA_MANAGER.get_projects()
+        project.name for project in flask.g.projects_metadata.get_projects()
     ]
     return flask.render_template("projects.html", project_names=project_names)
 
 
 @app.route('/projects/<name>/')
 def project(name):
-    project = _PROJECTS_METADATA_MANAGER.get_project(name)
+    project = flask.g.projects_metadata.get_project(name)
     versions = sorted(project.versions)
     return flask.render_template("project.html", project=project, versions=versions)
 
 
 @app.route('/projects/<name>/<version>/')
 def version(name, version):
-    project = _PROJECTS_METADATA_MANAGER.get_project(name)
+    project = flask.g.projects_metadata.get_project(name)
     assert version in project.versions
 
     doc_path = version_path(name, version)
-    doc_relpath = os.path.relpath(doc_path, STORE_PREFIX)
+    doc_relpath = os.path.relpath(doc_path, store_prefix(app))
     redirect_path = os.path.join("/docs-static", doc_relpath)
     response = flask.make_response()
     response.headers['X-Accel-Redirect'] = redirect_path
