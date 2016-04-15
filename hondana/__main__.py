@@ -1,6 +1,5 @@
-if __name__ == '__main__':
-    from hondana.app import app
-    # import side effect
-    import hondana.views  # noqa
+from hondana import app
 
+
+if __name__ == '__main__':
     app.run(debug=True)

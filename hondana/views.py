@@ -11,7 +11,7 @@ import flask.views
 import werkzeug
 import zipfile
 
-from .app import app, projects_prefix, store_prefix
+from hondana import app, projects_prefix, store_prefix
 from .utils import rm_rf, tempdir
 
 
