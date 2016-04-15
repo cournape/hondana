@@ -5,6 +5,7 @@ from __future__ import absolute_import, print_function
 import os.path
 import re
 import textwrap
+import uuid
 
 import flask
 import flask.views
@@ -38,21 +39,31 @@ def version_path(name, version):
     return os.path.join(project_path(name), version)
 
 
-def unzip_doc(config, projects_manager, upload, name, version):
-    target_directory = version_path(name, version)
-
+def _backup_if_required(projects_manager, name, version):
     if projects_manager.has_version(name, version):
         backup = target_directory + ".bak"
         os.rename(target_directory, backup)
     else:
         backup = None
 
+    return backup
+
+
+def unzip_doc(config, projects_manager, upload, name, version):
+    target_directory = version_path(name, version)
+
+    blob_id = uuid.uuid4().hex
+    extract_dir = os.path.join(os.path.dirname(target_directory), blob_id)
+
+    backup = _backup_if_required(projects_manager, name, version)
+
     try:
         with tempdir() as d:
-	    zipfile_path = os.path.join(d, "doc.zip")
+            zipfile_path = os.path.join(d, "doc.zip")
             upload.save(zipfile_path)
             with zipfile.ZipFile(zipfile_path) as zp:
-                zp.extractall(target_directory)
+                zp.extractall(extract_dir)
+        os.rename(extract_dir, target_directory)
         projects_manager.add_project(name, version)
     except Exception:
         rm_rf(target_directory)
