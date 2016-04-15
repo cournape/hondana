@@ -9,8 +9,8 @@
 
 {% block body %}
     <ul>
-    {% for version, link in versions %}
-    <li><a href={{ link }}>{{version }}</a></li>
+    {% for version in versions %}
+    <li><a href={{ version + "/" }}>{{version }}</a></li>
     {% endfor %}
     </ul>
 {% endblock %}

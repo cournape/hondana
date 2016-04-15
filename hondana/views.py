@@ -147,19 +147,16 @@ def root():
 
 @app.route('/projects/')
 def projects():
-    projects = [
-        (project, project.name) for project in _PROJECTS_MANAGER.get_projects()
+    project_names = [
+        project.name for project in _PROJECTS_MANAGER.get_projects()
     ]
-    return flask.render_template("projects.html", projects=projects)
+    return flask.render_template("projects.html", project_names=project_names)
 
 
 @app.route('/projects/<name>/')
 def project(name):
     project = _PROJECTS_MANAGER.get_project(name)
-    versions = [
-        (version, "/projects/" + project.name + "/" + version)
-        for version in sorted(project.versions)
-    ]
+    versions = sorted(project.versions)
     return flask.render_template("project.html", project=project, versions=versions)
 
 
