@@ -66,6 +66,7 @@ def unzip_doc(config, projects_manager, upload, name, version):
         os.rename(extract_dir, target_directory)
         projects_manager.add_project(name, version)
     except Exception:
+        rm_rf(extract_dir)
         rm_rf(target_directory)
         if backup is not None:
             os.rename(backup, target_directory)
