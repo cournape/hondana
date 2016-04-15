@@ -12,7 +12,8 @@ class Project(object):
     versions = attr(validator=instance_of(list))
 
 
-class ProjectsManager(object):
+class ProjectsMetadataManager(object):
+    """ In-memory representation of the projects stored on the filesystem. """
     @classmethod
     def from_directory(cls, directory):
         projects = []

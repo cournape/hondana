@@ -16,7 +16,7 @@ import zipfile
 
 from .app import app
 from .config import Configuration
-from .models import Project, ProjectsManager
+from .models import Project, ProjectsMetadataManager
 from .utils import rm_rf, tempdir
 
 
@@ -28,7 +28,7 @@ CONFIG = Configuration(STORE_PREFIX, "a super secret")
 CONFIG.validate()
 app.config["SECRET_KEY"] = CONFIG.secret_key
 
-_PROJECTS_MANAGER = ProjectsManager.from_directory(CONFIG.projects_prefix)
+_PROJECTS_METADATA_MANAGER = ProjectsMetadataManager.from_directory(CONFIG.projects_prefix)
 
 
 def project_path(name):
@@ -93,7 +93,7 @@ def upload():
         name = m.groups()[0]
         version = m.groups()[1]
 
-        unzip_doc(CONFIG, _PROJECTS_MANAGER, upload, name, version)
+        unzip_doc(CONFIG, _PROJECTS_METADATA_MANAGER, upload, name, version)
 
         return "", 204
     else:
@@ -103,24 +103,24 @@ def upload():
 class ProjectsAPI(flask.views.MethodView):
     def get(self, project_name, version):
         if project_name is None:
-            project_names = [project.name for project in _PROJECTS_MANAGER.get_projects()]
+            project_names = [project.name for project in _PROJECTS_METADATA_MANAGER.get_projects()]
             return flask.jsonify({"projects": project_names})
         else:
-            if _PROJECTS_MANAGER.has_project(project_name):
-                project = _PROJECTS_MANAGER.get_project(project_name)
+            if _PROJECTS_METADATA_MANAGER.has_project(project_name):
+                project = _PROJECTS_METADATA_MANAGER.get_project(project_name)
                 return flask.jsonify({"name": project_name, "versions": project.versions})
             else:
                 return flask.jsonify({"error": "no such project"}), 404
 
     def delete(self, project_name, version):
-        if _PROJECTS_MANAGER.has_project(project_name):
+        if _PROJECTS_METADATA_MANAGER.has_project(project_name):
             if version is None:
                 rm_rf(project_path(project_name))
-                _PROJECTS_MANAGER.delete_project(project_name)
+                _PROJECTS_METADATA_MANAGER.delete_project(project_name)
             else:
-                if _PROJECTS_MANAGER.has_version(project_name, version):
+                if _PROJECTS_METADATA_MANAGER.has_version(project_name, version):
                     rm_rf(version_path(project_name, version))
-                    _PROJECTS_MANAGER.delete_version(project_name, version)
+                    _PROJECTS_METADATA_MANAGER.delete_version(project_name, version)
                 else:
                     return flask.jsonify({"error": "no such version"}), 404
             return "", 204
@@ -149,21 +149,21 @@ def root():
 @app.route('/projects/')
 def projects():
     project_names = [
-        project.name for project in _PROJECTS_MANAGER.get_projects()
+        project.name for project in _PROJECTS_METADATA_MANAGER.get_projects()
     ]
     return flask.render_template("projects.html", project_names=project_names)
 
 
 @app.route('/projects/<name>/')
 def project(name):
-    project = _PROJECTS_MANAGER.get_project(name)
+    project = _PROJECTS_METADATA_MANAGER.get_project(name)
     versions = sorted(project.versions)
     return flask.render_template("project.html", project=project, versions=versions)
 
 
 @app.route('/projects/<name>/<version>/')
 def version(name, version):
-    project = _PROJECTS_MANAGER.get_project(name)
+    project = _PROJECTS_METADATA_MANAGER.get_project(name)
     assert version in project.versions
 
     doc_path = version_path(name, version)
