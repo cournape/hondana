@@ -9,8 +9,8 @@
 
 {% block body %}
     <ul>
-    {% for project, link in projects %}
-    <li><a href={{ link }}>{{ project.name }}</a></li>
+    {% for project_name in project_names %}
+    <li><a href={{ project_name + "/" }}>{{ project_name }}</a></li>
     {% endfor %}
     </ul>
 {% endblock %}
