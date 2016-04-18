@@ -1,3 +1,4 @@
+import os
 import os.path
 
 import flask
@@ -13,7 +14,11 @@ _STORE_PREFIX = "HONDANA_STORE_PREFIX"
 def app_factory():
     store_prefix = os.path.abspath(".store")
 
-    config = Configuration(store_prefix, "a super secret")
+    config_path = os.environ.get("HONDANA_CONFIG")
+    if config_path is None:
+        config_path = "config.yaml"
+
+    config = Configuration.from_path(config_path)
     config.validate()
 
     app = flask.Flask(__name__)
