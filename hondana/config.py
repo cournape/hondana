@@ -18,7 +18,7 @@ class Configuration(object):
         return os.path.join(self.store_prefix, "docs", "projects")
 
     def validate(self):
-	# We don't makedirs that one to avoid silently storing them somehwere
-	# unexpected
+        # We don't makedirs that one to avoid silently storing them somehwere
+        # unexpected
         assert os.path.exists(self.store_prefix)
         makedirs(self.projects_prefix)

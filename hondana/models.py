@@ -12,7 +12,8 @@ class Project(object):
     versions = attr(validator=instance_of(list))
 
 
-class ProjectsManager(object):
+class ProjectsMetadataManager(object):
+    """ In-memory representation of the projects stored on the filesystem. """
     @classmethod
     def from_directory(cls, directory):
         projects = []
@@ -33,7 +34,7 @@ class ProjectsManager(object):
             self._projects[project.name] = project
         else:
             project = self.get_project(name)
-            if not version in project.versions:
+            if version not in project.versions:
                 project.versions.append(version)
 
     def delete_project(self, name):
