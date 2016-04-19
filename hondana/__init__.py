@@ -1,3 +1,4 @@
+import logging
 import os
 import os.path
 
@@ -44,6 +45,13 @@ def before_request():
     flask.g.projects_metadata = ProjectsMetadataManager.from_directory(
         app.config[_PROJECTS_PREFIX]
     )
+
+@app.before_first_request
+def setup_logging():
+    if not app.debug:
+        # In production mode, add log handler to sys.stderr.
+        app.logger.addHandler(logging.StreamHandler())
+        app.logger.setLevel(logging.INFO)
 
 
 from . import views

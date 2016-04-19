@@ -1,0 +1,26 @@
+# run.docker
+FROM deployment-base
+
+ADD . /srv/hondana-git
+
+COPY nginx.conf.in /etc/nginx/sites-enabled/hondana
+
+RUN apt-get install -qy \
+		-o APT::Install-Recommends=false -o APT::Install-Suggests=false \
+		nginx supervisor && \
+	apt-get clean && \
+	unlink /etc/nginx/sites-enabled/default && \
+	sed -e "s|HONDANA_SOURCES|/srv/hondana-git|g" -i /etc/nginx/sites-enabled/hondana && \
+	/srv/env/bin/pip install --no-index -f /srv/hondana-git/wheelhouse hondana gunicorn && \
+	/srv/env/bin/python \
+		/srv/hondana-git/scripts/generate_conf.py \
+		/srv/hondana-git/config.yaml.j2 /srv/hondana-git/config.yaml
+
+VOLUME /srv/store
+
+COPY supervisor.conf /etc/supervisor/conf.d/hondana.conf
+
+# Run the app
+EXPOSE 80
+ENV HONDANA_CONFIG /srv/hondana-git/config.yaml
+CMD ["/usr/bin/supervisord", "-n"]

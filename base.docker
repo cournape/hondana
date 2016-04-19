@@ -1,0 +1,12 @@
+# Set the base image to Ubuntu
+FROM ubuntu
+
+MAINTAINER David Cournapeau
+
+RUN apt-get update && \
+	apt-get install -qy \
+		-o APT::Install-Recommends=false -o APT::Install-Suggests=false \
+		python-virtualenv && \
+	apt-get clean && \
+	virtualenv /srv/env && \
+	/srv/env/bin/pip install -U pip setuptools

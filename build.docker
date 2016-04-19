@@ -1,0 +1,16 @@
+FROM deployment-base
+
+RUN . /srv/env/bin/activate; \
+	pip install wheel
+
+ENV WHEELHOUSE=/wheelhouse
+ENV PIP_WHEEL_DIR=/wheelhouse
+ENV PIP_FIND_LINKS=/wheelhouse
+
+VOLUME /wheelhouse
+VOLUME /application
+
+ENTRYPOINT . /srv/env/bin/activate; \
+	cd /application; \
+	pip wheel . \
+	pip wheel gunicorn
