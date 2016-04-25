@@ -4,10 +4,21 @@ To run hondana in docker, we have prepared a set of 3 docker images:
 2. the build image to build the wheels (build.docker Dockerfile)
 3. the actual hondana image where hondana is deployed w/ nginx
 
-The basic workflow:
+The basic workflow to build the docker images:
 
-	```
+	``` bash
 	# Build the base image
 	docker build -t deployment-base -f base.docker .;
 	# Build the build image
-	docker build -t deployment-builer -f build.docker .;
+	docker build -t deployment-build -f build.docker .;
+	# Build the wheels using the build image. Built wheels are located into $PWD/wheelhouse
+	docker run --rm -v "$(pwd)":/application -v "$(pwd)"/wheelhouse:/wheelhouse deployment-build;
+        # Build the deployment image
+        docker build -t deployment-run -f run.docker
+	```
+
+Then to run hondana:
+
+	``` bash
+	docker run -p 80:80 -v $(pwd)/store:/srv/store deployment-run
+	```
