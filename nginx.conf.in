@@ -7,7 +7,7 @@ server {
     }
  
     location /docs-static/ {
-        alias HONDANA_SOURCES/.store/;
+        alias HONDANA_STORE/;
     }
  
     location / {
