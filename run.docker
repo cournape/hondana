@@ -12,16 +12,14 @@ RUN apt-get install -qy \
 	unlink /etc/nginx/sites-enabled/default && \
 	sed -e "s|HONDANA_SOURCES|/srv/hondana-git|g" -i /etc/nginx/sites-enabled/hondana && \
 	sed -e "s|HONDANA_STORE|/srv/store|g" -i /etc/nginx/sites-enabled/hondana && \
-	/srv/env/bin/pip install --no-index -f /srv/hondana-git/wheelhouse hondana gunicorn && \
-	/srv/env/bin/python \
-		/srv/hondana-git/scripts/generate_conf.py \
-		/srv/hondana-git/config.yaml.j2 /srv/hondana-git/config.yaml
+	/srv/env/bin/pip install --no-index -f /srv/hondana-git/wheelhouse hondana gunicorn
 
 VOLUME /srv/store
+VOLUME /srv/config
 
 COPY supervisor.conf /etc/supervisor/conf.d/hondana.conf
 
 # Run the app
 EXPOSE 80
-ENV HONDANA_CONFIG /srv/hondana-git/config.yaml
+ENV HONDANA_CONFIG /srv/config/config.yaml
 CMD ["/usr/bin/supervisord", "-n"]
