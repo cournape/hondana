@@ -20,4 +20,4 @@ Features
 Deployment
 ==========
 
-See Docker.rst for a simple deployment using docker.
+See :file:`Docker.md` for a simple deployment using docker.
