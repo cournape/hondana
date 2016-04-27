@@ -1,0 +1,12 @@
+# Set the base image to Ubuntu
+FROM ubuntu:15.10
+
+MAINTAINER David Cournapeau
+
+RUN apt-get update && \
+	apt-get install -qy \
+		-o APT::Install-Recommends=false -o APT::Install-Suggests=false \
+		virtualenv && \
+	apt-get clean && \
+	virtualenv /srv/env -p python3 && \
+	/srv/env/bin/python -m pip install -U pip setuptools

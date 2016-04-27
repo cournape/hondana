@@ -1,0 +1,7 @@
+.tox
+hondana.egg-info
+
+# used by the docker images
+config
+store
+wheelhouse
