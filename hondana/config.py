@@ -24,6 +24,10 @@ class Configuration(object):
         return cls(store_prefix, secret)
 
     @property
+    def backups_prefix(self):
+        return os.path.join(self.store_prefix, "docs", "backups")
+
+    @property
     def projects_prefix(self):
         return os.path.join(self.store_prefix, "docs", "projects")
 
@@ -32,3 +36,4 @@ class Configuration(object):
         # unexpected
         assert os.path.exists(self.store_prefix)
         makedirs(self.projects_prefix)
+        makedirs(self.backups_prefix)
