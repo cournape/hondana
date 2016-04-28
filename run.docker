@@ -22,4 +22,4 @@ COPY supervisor.conf /etc/supervisor/conf.d/hondana.conf
 # Run the app
 EXPOSE 80
 ENV HONDANA_CONFIG /srv/config/config.yaml
-CMD ["/usr/bin/supervisord", "-n"]
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf"]

@@ -9,6 +9,7 @@ from .models import ProjectsMetadataManager
 
 
 _PROJECTS_PREFIX = "HONDANA_PROJECTS_PREFIX"
+_BACKUPS_PREFIX = "HONDANA_BACKUPS_PREFIX"
 _STORE_PREFIX = "HONDANA_STORE_PREFIX"
 
 
@@ -26,6 +27,7 @@ def app_factory():
     app.config["SECRET_KEY"] = config.secret_key
     app.config[_PROJECTS_PREFIX] = config.projects_prefix
     app.config[_STORE_PREFIX] = config.store_prefix
+    app.config[_BACKUPS_PREFIX] = config.backups_prefix
 
     return app
 
@@ -38,6 +40,10 @@ def projects_prefix(app):
 
 def store_prefix(app):
     return app.config[_STORE_PREFIX]
+
+
+def backups_prefix(app):
+    return app.config[_BACKUPS_PREFIX]
 
 
 @app.before_request

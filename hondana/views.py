@@ -4,6 +4,7 @@ from __future__ import absolute_import, print_function
 
 import os.path
 import re
+import shutil
 import uuid
 
 import flask
@@ -11,7 +12,7 @@ import flask.views
 import werkzeug
 import zipfile
 
-from hondana import app, projects_prefix, store_prefix
+from hondana import app, backups_prefix, projects_prefix, store_prefix
 from .utils import rm_rf, tempdir
 
 
@@ -51,6 +52,11 @@ def unzip_doc(projects_manager, upload, name, version):
             upload.save(zipfile_path)
             with zipfile.ZipFile(zipfile_path) as zp:
                 zp.extractall(extract_dir)
+            saved_zip = os.path.join(
+                backups_prefix(app), werkzeug.secure_filename(upload.filename)
+            )
+            shutil.copy(zipfile_path, saved_zip + ".bak")
+            os.rename(saved_zip + ".bak", saved_zip)
         os.rename(extract_dir, target_directory)
         projects_manager.add_project(name, version)
     except Exception:
